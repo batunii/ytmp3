@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 var Counter = 0
@@ -28,9 +29,11 @@ func deleteFile(fileName string) {
 func ytdlDownloader(ytUrl string, fileName string) {
 	fmt.Printf("[Go Youtube] :: Started the process to download %v, in file %s\n", ytUrl, fileName)
 	cmd := exec.Command("yt-dlp", "-x", "--audio-format", "mp3", "--output", fileName, ytUrl)
+	fmt.Println(cmd)
 	_, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Printf("Error generated : %v\n", err)
+		return
 	}
 	fmt.Printf("The File has been generated with name : %s\n", fileName)
 	isDownloaded = true
@@ -45,13 +48,13 @@ func getStatusHandler(write http.ResponseWriter, read *http.Request) {
 func downloadProvideHandler(write http.ResponseWriter, read *http.Request) {
 	enableCors(&write)
 	filePath := read.FormValue("fileName")
-	defer deleteFile(filePath)
 
 	file, err := os.Open(filePath)
 	if err != nil {
 		http.Error(write, "File not found", 404)
 		return
 	}
+	defer deleteFile(filePath)
 	defer file.Close()
 	fileName := filepath.Base(filePath)
 
@@ -64,10 +67,14 @@ func downloadProvideHandler(write http.ResponseWriter, read *http.Request) {
 func downloadTrigggerHandler(write http.ResponseWriter, read *http.Request) {
 	enableCors(&write)
 	ytUrl := read.FormValue("ytUrl")
+	if strings.TrimSpace(ytUrl) == "" {
+		fmt.Fprintf(write, "You have not given a valid link in parameter ytUrl : %s", ytUrl)
+		return
+	}
 	newFileName := getNextSavedName()
 	go ytdlDownloader(ytUrl, newFileName)
 	isDownloaded = false
-	fmt.Fprintf(write, "{fileName:%s,status:In Progress}", newFileName)
+	fmt.Fprintf(write, "%s", newFileName)
 }
 
 func homePageHandler(write http.ResponseWriter, req *http.Request) {
